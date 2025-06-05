@@ -3,20 +3,40 @@ import yfinance as yf
 import pandas_ta as ta
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Jared - Stock Analysis Agent", layout="wide")
-st.title("📈 Jared: Your Technical Analysis Companion")
+# === PAGE CONFIG ===
+st.set_page_config(page_title="Jared • AI Stock Scout", layout="wide")
 
-ticker_input = st.text_input("Enter a stock, ETF, or BDC symbol (e.g., TSLA, PLTR, O, MAIN, VTI):", "PLTR")
-timeframes = {"1 Hour": ("60m", "7d"), "Daily": ("1d", "6mo"), "Weekly": ("1wk", "2y")}
+# === SIDEBAR ===
+with st.sidebar:
+    st.title("🧠 Jared: AI Stock Scout")
+    st.markdown("**Enter a ticker symbol** (stock, ETF, or BDC) to get insights.")
+    st.markdown("Jared checks the **1H, Daily, and Weekly** charts for:")
+    st.markdown("""
+    - 🔄 Reversals
+    - 📈 Trend Continuations
+    - ✅ Buy Zones
+    """)
+    st.caption("Built with ❤️ for smart traders.")
 
+# === MAIN TITLE ===
+st.markdown("<h1 style='text-align: center; color: #00ffcc;'>Jared: Your Technical Analysis Companion</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #cccccc;'>Smart market moves powered by AI & TA</p>", unsafe_allow_html=True)
+
+# === INPUT ===
+ticker_input = st.text_input("🔍 Enter ticker (e.g. TSLA, PLTR, VTI, MAIN):", "PLTR")
+
+# === TIMEFRAMES ===
+timeframes = {
+    "1 Hour": ("60m", "7d"),
+    "Daily": ("1d", "6mo"),
+    "Weekly": ("1wk", "2y")
+}
+
+# === FUNCTIONS ===
 def fetch_data(ticker, interval, period):
-    try:
-        df = yf.download(ticker, interval=interval, period=period)
-        df.dropna(inplace=True)
-        return df
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return None
+    df = yf.download(ticker, interval=interval, period=period)
+    df.dropna(inplace=True)
+    return df
 
 def analyze(df):
     df['EMA20'] = ta.ema(df['Close'], length=20)
@@ -26,29 +46,27 @@ def analyze(df):
     latest = df.iloc[-1]
     previous = df.iloc[-2]
 
-    signals = []
+    alerts = []
 
-    # Change of Character
+    # Reversals
     if previous['Close'] < previous['EMA50'] and latest['Close'] > latest['EMA50']:
-        signals.append("🟢 Bullish reversal: price crossed above EMA50.")
+        alerts.append("🟢 Reversal: Price crossed ABOVE EMA50")
     elif previous['Close'] > previous['EMA50'] and latest['Close'] < latest['EMA50']:
-        signals.append("🔴 Bearish reversal: price crossed below EMA50.")
+        alerts.append("🔴 Reversal: Price crossed BELOW EMA50")
 
-    # Continuation trend
+    # Trend Check
     if latest['EMA20'] > latest['EMA50'] and latest['RSI'] > 50:
-        signals.append("📈 Uptrend continuation confirmed.")
+        alerts.append("📈 Uptrend: EMA20 > EMA50 and RSI > 50")
     elif latest['EMA20'] < latest['EMA50'] and latest['RSI'] < 50:
-        signals.append("📉 Downtrend continuation confirmed.")
+        alerts.append("📉 Downtrend: EMA20 < EMA50 and RSI < 50")
 
-    # Buy suggestion
+    # Buy Signal
     if latest['EMA20'] > latest['EMA50'] and latest['RSI'] < 45:
-        signals.append("✅ Potential BUY zone: Uptrend with temporary RSI pullback.")
-    elif latest['EMA20'] < latest['EMA50'] and latest['RSI'] > 60:
-        signals.append("⚠️ Overbought in downtrend: wait before buying.")
+        alerts.append("✅ Potential BUY: RSI pullback in an uptrend")
 
-    return signals
+    return alerts
 
-def plot_chart(df, timeframe_label, ticker):
+def plot_chart(df, tf_label, ticker):
     fig = go.Figure()
 
     fig.add_trace(go.Candlestick(
@@ -60,5 +78,35 @@ def plot_chart(df, timeframe_label, ticker):
     fig.add_trace(go.Scatter(x=df.index, y=df['EMA50'], line=dict(color='orange', width=1), name='EMA50'))
 
     fig.update_layout(
-        title=f"{ticker.upper()} -
+        title=f"{ticker.upper()} - {tf_label}",
+        xaxis_title="Date", yaxis_title="Price",
+        template="plotly_dark", height=400, margin=dict(t=30, b=30)
+    )
+    return fig
+
+# === ANALYSIS LOOP ===
+if ticker_input:
+    for tf_label, (interval, period) in timeframes.items():
+        st.markdown(f"### ⏱️ {tf_label}")
+        df = fetch_data(ticker_input, interval, period)
+        if not df.empty:
+            alerts = analyze(df)
+            cols = st.columns(len(alerts) if alerts else 1)
+            if alerts:
+                for i, alert in enumerate(alerts):
+                    with cols[i]:
+                        st.success(alert)
+            else:
+                st.warning("No technical signal detected at this time.")
+
+            fig = plot_chart(df, tf_label, ticker_input)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.error("⚠️ No data found for this timeframe.")
+
+st.markdown("---")
+st.markdown("<p style='text-align: center; color: #888;'>Jared is not financial advice. Do your own research. 🚀</p>", unsafe_allow_html=True)
+
+  
+  
 
